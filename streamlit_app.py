@@ -6,77 +6,76 @@ from transformers import (
     VisionEncoderDecoderModel, ViTImageProcessor, AutoTokenizer
 )
 
-# -------------------------------
-# Title
-# -------------------------------
+# ------------------------------------------------------------
+# TITLE
+# ------------------------------------------------------------
 st.title("📸 Image Caption Generator with Model Selection")
 
-st.write("Upload an image and choose a captioning model!")
+st.write("Upload an image and choose a model to generate a caption.")
 
-# -------------------------------
-# Upload Image
-# -------------------------------
-uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
-
-# -------------------------------
-# Model Options
-# -------------------------------
-model_choice = st.selectbox(
-    "Choose a model:",
-    ("BLIP Base", "BLIP Large", "ViT-GPT2")
+# ------------------------------------------------------------
+# SIDEBAR – MODEL SELECTION
+# ------------------------------------------------------------
+model_choice = st.sidebar.selectbox(
+    "Choose a captioning model:",
+    [
+        "BLIP Base (Salesforce/blip-image-captioning-base)",
+        "BLIP Large (Salesforce/blip-image-captioning-large)",
+        "ViT-GPT2 (nlpconnect/vit-gpt2-image-captioning)"
+    ]
 )
 
-# -------------------------------
-# Load Model
-# -------------------------------
-def load_model(choice):
-    if choice == "BLIP Base":
-        model_name = "Salesforce/blip-image-captioning-base"
-        processor = BlipProcessor.from_pretrained(model_name)
-        model = BlipForConditionalGeneration.from_pretrained(model_name)
-        return model, processor, None
+if "BLIP Base" in model_choice:
+    model_name = "Salesforce/blip-image-captioning-base"
+    processor = BlipProcessor.from_pretrained(model_name)
+    model = BlipForConditionalGeneration.from_pretrained(model_name)
 
-    elif choice == "BLIP Large":
-        model_name = "Salesforce/blip-image-captioning-large"
-        processor = BlipProcessor.from_pretrained(model_name)
-        model = BlipForConditionalGeneration.from_pretrained(model_name)
-        return model, processor, None
+elif "BLIP Large" in model_choice:
+    model_name = "Salesforce/blip-image-captioning-large"
+    processor = BlipProcessor.from_pretrained(model_name)
+    model = BlipForConditionalGeneration.from_pretrained(model_name)
 
-    else:  # ViT-GPT2
-        model_name = "nlpconnect/vit-gpt2-image-captioning"
-        model = VisionEncoderDecoderModel.from_pretrained(model_name)
-        processor = ViTImageProcessor.from_pretrained(model_name)
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        return model, processor, tokenizer
+else:
+    model_name = "nlpconnect/vit-gpt2-image-captioning"
+    model = VisionEncoderDecoderModel.from_pretrained(model_name)
+    processor = ViTImageProcessor.from_pretrained(model_name)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
 
+# ------------------------------------------------------------
+# IMAGE UPLOAD
+# ------------------------------------------------------------
+uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
 
-# -------------------------------
-# Generate Caption
-# -------------------------------
-if uploaded_file is not None:
-    img = Image.open(uploaded_file).convert("RGB")
+if uploaded_file:
+    img = Image.open(uploaded_file)
     st.image(img, caption="Uploaded Image", use_column_width=True)
 
-    st.subheader("📌 Generating Caption...")
+    img_rgb = img.convert("RGB")
 
-    # Load chosen model
-    model, processor, tokenizer = load_model(model_choice)
+    st.subheader("🔍 Generating Caption...")
 
+    # --------------------------------------------------------
     # BLIP MODELS
-    if model_choice in ["BLIP Base", "BLIP Large"]:
-        inputs = processor(img, return_tensors="pt")
-        out = model.generate(**inputs)
-        caption = processor.decode(out[0], skip_special_tokens=True)
+    # --------------------------------------------------------
+    if "BLIP" in model_choice:
+        inputs = processor(img_rgb, return_tensors="pt")
+        output = model.generate(**inputs)
+        caption = processor.decode(output[0], skip_special_tokens=True)
 
+    # --------------------------------------------------------
     # VIT-GPT2 MODEL
+    # --------------------------------------------------------
     else:
-        pixel_values = processor(images=img, return_tensors="pt").pixel_values
+        pixel_values = processor(images=img_rgb, return_tensors="pt").pixel_values
         output_ids = model.generate(pixel_values)
         caption = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
-    # -------------------------------
-    # Final Caption Display
-    # -------------------------------
+    # --------------------------------------------------------
+    # OUTPUT
+    # --------------------------------------------------------
     st.success("✨ Caption Generated Successfully!")
-    st.markdown(f"### 👉 **{caption}**")
+    st.markdown(f"""
+    ### 🟩 Final Caption:
+    **{caption}**
+    """)
 
